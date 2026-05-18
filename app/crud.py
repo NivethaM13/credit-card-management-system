@@ -46,7 +46,8 @@ def create_card(db: Session, card: schemas.CardCreate):
         user_id=card.user_id,
         card_holder=card.card_holder,
         card_number=masked_number,
-        expiry=card.expiry
+        expiry=card.expiry,
+        balance=50000
     )
 
     db.add(new_card)
@@ -58,48 +59,14 @@ def create_card(db: Session, card: schemas.CardCreate):
     return new_card
 
 
-# ================= CREATE PAYMENT =================
-
-def create_payment(
-    db: Session,
-    payment: schemas.PaymentCreate
-):
-
-    transaction = str(uuid.uuid4())
-
-    new_payment = models.Payment(
-        user_id=payment.user_id,
-        card_id=payment.card_id,
-        amount=payment.amount,
-        status="SUCCESS",
-        transaction_id=transaction
-    )
-
-    db.add(new_payment)
-
-    db.commit()
-
-    db.refresh(new_payment)
-
-    return new_payment
-
-
-# ================= PAYMENT HISTORY =================
-
-def get_payments(db: Session):
-
-    return db.query(models.Payment).all()
-
+# ================= GET CARDS =================
 
 def get_cards(db: Session):
 
     return db.query(models.Card).all()
 
 
-def get_transactions(db: Session):
-
-    return db.query(models.Transaction).all()
-
+# ================= DELETE CARD =================
 
 def delete_card(db: Session, card_id: int):
 
@@ -119,4 +86,89 @@ def delete_card(db: Session, card_id: int):
 
     return {
         "message": "Card Not Found"
+    }
+
+
+# ================= CREATE PAYMENT =================
+
+def create_payment(
+    db: Session,
+    payment: schemas.PaymentCreate
+):
+
+    card = db.query(models.Card).filter(
+        models.Card.id == payment.card_id
+    ).first()
+
+    if not card:
+
+        return {
+            "message": "Card Not Found"
+        }
+
+    if card.balance < payment.amount:
+
+        return {
+            "message": "Insufficient Balance"
+        }
+
+    card.balance -= payment.amount
+
+    transaction = str(uuid.uuid4())
+
+    new_payment = models.Payment(
+        user_id=payment.user_id,
+        card_id=payment.card_id,
+        amount=payment.amount,
+        status="SUCCESS",
+        transaction_id=transaction
+    )
+
+    db.add(new_payment)
+
+    db.commit()
+
+    db.refresh(new_payment)
+
+    return {
+        "message": "Payment Successful",
+        "remaining_balance": card.balance,
+        "payment": new_payment
+    }
+
+
+# ================= PAYMENT HISTORY =================
+
+def get_payments(db: Session):
+
+    return db.query(models.Payment).all()
+
+
+# ================= GET TRANSACTIONS =================
+
+def get_transactions(db: Session):
+
+    return db.query(models.Payment).all()
+
+
+# ================= DELETE TRANSACTION =================
+
+def delete_transaction(db: Session, transaction_id: int):
+
+    transaction = db.query(models.Payment).filter(
+        models.Payment.id == transaction_id
+    ).first()
+
+    if transaction:
+
+        db.delete(transaction)
+
+        db.commit()
+
+        return {
+            "message": "Transaction Deleted"
+        }
+
+    return {
+        "message": "Transaction Not Found"
     }

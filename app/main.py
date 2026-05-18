@@ -5,11 +5,12 @@ from sqlalchemy.orm import Session
 from app import models, schemas, crud
 
 from app.database import engine, Base, get_db
-from app.auth import verify_password,create_access_token
+from app.auth import verify_password, create_access_token
 
 app = FastAPI()
 
 
+# ================= CORS =================
 
 app.add_middleware(
     CORSMiddleware,
@@ -19,9 +20,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # ================= CREATE TABLES =================
 
 Base.metadata.create_all(bind=engine)
+
 
 # ================= HOME =================
 
@@ -33,7 +36,7 @@ def home():
     }
 
 
-
+# ================= REGISTER =================
 
 @app.post("/register")
 def register(
@@ -44,20 +47,27 @@ def register(
     return crud.create_user(db, user)
 
 
-
+# ================= LOGIN =================
 
 @app.post("/login")
-@app.post("/login")
-def login(user: schemas.LoginSchema, db: Session = Depends(get_db)):
+def login(
+    user: schemas.LoginSchema,
+    db: Session = Depends(get_db)
+):
 
     db_user = crud.login_user(db, user.email)
 
     if not db_user:
+
         return {
             "message": "User not found"
         }
 
-    if not verify_password(user.password, db_user.password):
+    if not verify_password(
+        user.password,
+        db_user.password
+    ):
+
         return {
             "message": "Invalid password"
         }
@@ -72,6 +82,8 @@ def login(user: schemas.LoginSchema, db: Session = Depends(get_db)):
     }
 
 
+# ================= ADD CARD =================
+
 @app.post("/add-card")
 def add_card(
     card: schemas.CardCreate,
@@ -81,7 +93,28 @@ def add_card(
     return crud.create_card(db, card)
 
 
+# ================= VIEW CARDS =================
 
+@app.get("/cards")
+def view_cards(
+    db: Session = Depends(get_db)
+):
+
+    return crud.get_cards(db)
+
+
+# ================= DELETE CARD =================
+
+@app.delete("/delete-card/{card_id}")
+def remove_card(
+    card_id: int,
+    db: Session = Depends(get_db)
+):
+
+    return crud.delete_card(db, card_id)
+
+
+# ================= MAKE PAYMENT =================
 
 @app.post("/make-payment")
 def make_payment(
@@ -95,6 +128,8 @@ def make_payment(
     )
 
 
+# ================= PAYMENT HISTORY =================
+
 @app.get("/payment-history")
 def payment_history(
     db: Session = Depends(get_db)
@@ -103,10 +138,7 @@ def payment_history(
     return crud.get_payments(db)
 
 
-@app.get("/cards")
-def view_cards(db: Session = Depends(get_db)):
-
-    return crud.get_cards(db)
+# ================= TRANSACTIONS =================
 
 @app.get("/transactions")
 def view_transactions(
@@ -116,11 +148,15 @@ def view_transactions(
     return crud.get_transactions(db)
 
 
+# ================= DELETE TRANSACTION =================
 
-@app.delete("/delete-card/{card_id}")
-def remove_card(
-    card_id: int,
+@app.delete("/delete-transaction/{transaction_id}")
+def delete_transaction(
+    transaction_id: int,
     db: Session = Depends(get_db)
 ):
 
-    return crud.delete_card(db, card_id)
+    return crud.delete_transaction(
+        db,
+        transaction_id
+    )

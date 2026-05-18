@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float
 from app.database import Base
-from app import models
+
 
 # ================= USERS TABLE =================
 
@@ -33,6 +33,8 @@ class Card(Base):
 
     expiry = Column(String(10))
 
+    balance = Column(Float, default=50000)
+
 
 # ================= PAYMENTS TABLE =================
 
@@ -51,3 +53,20 @@ class Payment(Base):
     status = Column(String(50))
 
     transaction_id = Column(String(100))
+
+
+# ================= TRANSACTIONS TABLE =================
+
+class Transaction(Base):
+
+    __tablename__ = "transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    user_id = Column(Integer)
+
+    card_id = Column(Integer)
+
+    amount = Column(Float)
+
+    status = Column(String(100))
