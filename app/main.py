@@ -1,162 +1,79 @@
-from fastapi import FastAPI, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
+import hashlib
 
-from app import models, schemas, crud
+from jose import jwt, JWTError
 
-from app.database import engine, Base, get_db
-from app.auth import verify_password, create_access_token
-
-app = FastAPI()
+from datetime import datetime, timedelta
 
 
-# ================= CORS =================
+# ================= SECRET KEY =================
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+SECRET_KEY = "creditcardproject"
+
+ALGORITHM = "HS256"
+
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 
-# ================= CREATE TABLES =================
+# ================= HASH PASSWORD =================
 
-Base.metadata.create_all(bind=engine)
+def hash_password(password: str):
 
-
-# ================= HOME =================
-
-@app.get("/")
-def home():
-
-    return {
-        "message": "Credit Card Management System Running"
-    }
+    return hashlib.sha256(
+        password.encode()
+    ).hexdigest()
 
 
-# ================= REGISTER =================
+# ================= VERIFY PASSWORD =================
 
-@app.post("/register")
-def register(
-    user: schemas.UserCreate,
-    db: Session = Depends(get_db)
+def verify_password(
+    plain_password,
+    hashed_password
 ):
 
-    return crud.create_user(db, user)
+    return hash_password(
+        plain_password
+    ) == hashed_password
 
 
-# ================= LOGIN =================
+# ================= CREATE ACCESS TOKEN =================
 
-@app.post("/login")
-def login(
-    user: schemas.LoginSchema,
-    db: Session = Depends(get_db)
-):
+def create_access_token(data: dict):
 
-    db_user = crud.login_user(db, user.email)
+    to_encode = data.copy()
 
-    if not db_user:
-
-        return {
-            "message": "User not found"
-        }
-
-    if not verify_password(
-        user.password,
-        db_user.password
-    ):
-
-        return {
-            "message": "Invalid password"
-        }
-
-    token = create_access_token(
-        data={"sub": db_user.email}
+    expire = datetime.utcnow() + timedelta(
+        minutes=ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
-    return {
-        "message": "Login Successful",
-        "access_token": token
-    }
+    to_encode.update({
+        "exp": expire
+    })
 
-
-# ================= ADD CARD =================
-
-@app.post("/add-card")
-def add_card(
-    card: schemas.CardCreate,
-    db: Session = Depends(get_db)
-):
-
-    return crud.create_card(db, card)
-
-
-# ================= VIEW CARDS =================
-
-@app.get("/cards")
-def view_cards(
-    db: Session = Depends(get_db)
-):
-
-    return crud.get_cards(db)
-
-
-# ================= DELETE CARD =================
-
-@app.delete("/delete-card/{card_id}")
-def remove_card(
-    card_id: int,
-    db: Session = Depends(get_db)
-):
-
-    return crud.delete_card(db, card_id)
-
-
-# ================= MAKE PAYMENT =================
-
-@app.post("/make-payment")
-def make_payment(
-    payment: schemas.PaymentCreate,
-    db: Session = Depends(get_db)
-):
-
-    return crud.create_payment(
-        db,
-        payment
+    encoded_jwt = jwt.encode(
+        to_encode,
+        SECRET_KEY,
+        algorithm=ALGORITHM
     )
 
-
-# ================= PAYMENT HISTORY =================
-
-@app.get("/payment-history")
-def payment_history(
-    db: Session = Depends(get_db)
-):
-
-    return crud.get_payments(db)
+    return encoded_jwt
 
 
-# ================= TRANSACTIONS =================
+# ================= VERIFY TOKEN =================
 
-@app.get("/transactions")
-def view_transactions(
-    db: Session = Depends(get_db)
-):
+def verify_token(token: str):
 
-    return crud.get_transactions(db)
+    try:
 
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
 
-# ================= DELETE TRANSACTION =================
+        email = payload.get("sub")
 
-@app.delete("/delete-transaction/{transaction_id}")
-def delete_transaction(
-    transaction_id: int,
-    db: Session = Depends(get_db)
-):
+        return email
 
-    return crud.delete_transaction(
-        db,
-        transaction_id
-    )
+    except JWTError:
+
+        return None
