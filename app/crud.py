@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app import models
 from app import schemas
 import uuid
+import pandas as pd
 
 from app.auth import hash_password
 
@@ -15,7 +16,8 @@ def create_user(db: Session, user: schemas.UserCreate):
     new_user = models.User(
         name=user.name,
         email=user.email,
-        password=hashed_password
+        password=hashed_password,
+        role="USER"
     )
 
     db.add(new_user)
@@ -168,8 +170,314 @@ def delete_transaction(db: Session, transaction_id: int):
         return {
             "message": "Transaction Deleted"
         }
-    
 
     return {
         "message": "Transaction Not Found"
     }
+
+
+# ================= CREATE WALLET =================
+
+def create_wallet(
+    db: Session,
+    wallet: schemas.WalletCreate
+):
+
+    new_wallet = models.Wallet(
+        user_id=wallet.user_id,
+        balance=0,
+        wallet_status="ACTIVE",
+        created_at="2026"
+    )
+
+    db.add(new_wallet)
+
+    db.commit()
+
+    db.refresh(new_wallet)
+
+    return new_wallet
+
+
+# ================= ADD MONEY =================
+
+def add_money(
+    db: Session,
+    wallet_data: schemas.AddMoney
+):
+
+    wallet = db.query(models.Wallet).filter(
+        models.Wallet.id == wallet_data.wallet_id
+    ).first()
+
+    if not wallet:
+
+        return {
+            "message": "Wallet Not Found"
+        }
+
+    wallet.balance += wallet_data.amount
+
+    transaction = models.WalletTransaction(
+        wallet_id=wallet.id,
+        amount=wallet_data.amount,
+        transaction_type="CREDIT",
+        status="SUCCESS",
+        created_at="2026"
+    )
+
+    db.add(transaction)
+
+    db.commit()
+
+    return {
+        "message": "Money Added Successfully",
+        "balance": wallet.balance
+    }
+
+
+# ================= CREATE RECEIPT =================
+
+def create_receipt(
+    db: Session,
+    receipt: schemas.ReceiptCreate
+):
+
+    receipt_number = "RCPT-" + str(uuid.uuid4())[:8]
+
+    new_receipt = models.Receipt(
+        transaction_id=receipt.transaction_id,
+        receipt_number=receipt_number,
+        file_url="receipt.pdf",
+        generated_at="2026"
+    )
+
+    db.add(new_receipt)
+
+    db.commit()
+
+    db.refresh(new_receipt)
+
+    return new_receipt
+
+
+# ================= CREATE REFUND =================
+
+def create_refund(
+    db: Session,
+    refund: schemas.RefundCreate
+):
+
+    new_refund = models.Refund(
+        transaction_id=refund.transaction_id,
+        refund_amount=refund.refund_amount,
+        refund_status="PENDING",
+        reason=refund.reason,
+        created_at="2026"
+    )
+
+    db.add(new_refund)
+
+    db.commit()
+
+    db.refresh(new_refund)
+
+    return new_refund
+
+
+# ================= CREATE SECURITY LOG =================
+
+def create_security_log(
+    db: Session,
+    log: schemas.SecurityLogCreate
+):
+
+    new_log = models.SecurityLog(
+        user_id=log.user_id,
+        activity=log.activity,
+        ip_address=log.ip_address,
+        status=log.status,
+        created_at="2026"
+    )
+
+    db.add(new_log)
+
+    db.commit()
+
+    db.refresh(new_log)
+
+    return new_log
+
+
+# ================= PAYMENT ANALYTICS =================
+
+def get_payment_analytics(db: Session):
+
+    total_transactions = db.query(
+        models.Payment
+    ).count()
+
+    successful_payments = db.query(
+        models.Payment
+    ).filter(
+        models.Payment.status == "SUCCESS"
+    ).count()
+
+    total_revenue = 0
+
+    payments = db.query(models.Payment).all()
+
+    for payment in payments:
+
+        total_revenue += payment.amount
+
+    return {
+        "total_transactions": total_transactions,
+        "successful_payments": successful_payments,
+        "total_revenue": total_revenue
+    }
+
+
+# ================= CREATE NOTIFICATION =================
+
+def create_notification(
+    db: Session,
+    notification: schemas.NotificationCreate
+):
+
+    new_notification = models.Notification(
+        user_id=notification.user_id,
+        title=notification.title,
+        message=notification.message,
+        is_read="NO",
+        created_at="2026"
+    )
+
+    db.add(new_notification)
+
+    db.commit()
+
+    db.refresh(new_notification)
+
+    return new_notification
+
+# ================= FILTER TRANSACTIONS =================
+
+def filter_transactions(
+    db,
+    status=None,
+    min_amount=None,
+    max_amount=None
+):
+
+    query = db.query(models.Transaction)
+
+    if status:
+
+        query = query.filter(
+            models.Transaction.status == status
+        )
+
+    if min_amount:
+
+        query = query.filter(
+            models.Transaction.amount >= min_amount
+        )
+
+    if max_amount:
+
+        query = query.filter(
+            models.Transaction.amount <= max_amount
+        )
+
+    return query.all()
+# ================= CREATE AUDIT LOG =================
+
+def create_audit_log(
+    db: Session,
+    audit: schemas.AuditLogCreate
+):
+
+    new_audit = models.AuditLog(
+        user_id=audit.user_id,
+        action=audit.action,
+        entity=audit.entity,
+        created_at="2026"
+    )
+
+    db.add(new_audit)
+
+    db.commit()
+
+    db.refresh(new_audit)
+
+    return new_audit
+
+# ================= CREATE STATEMENT LOG =================
+
+def create_statement_log(
+    db: Session,
+    statement: schemas.StatementLogCreate
+):
+
+    new_statement = models.StatementLog(
+        user_id=statement.user_id,
+        statement_type=statement.statement_type,
+        generated_at="2026"
+    )
+
+    db.add(new_statement)
+
+    db.commit()
+
+    db.refresh(new_statement)
+
+    return new_statement
+
+# ================= EXPORT CSV =================
+
+def export_transactions_csv(db: Session):
+
+    payments = db.query(models.Payment).all()
+
+    data = []
+
+    for payment in payments:
+
+        data.append({
+            "ID": payment.id,
+            "User ID": payment.user_id,
+            "Card ID": payment.card_id,
+            "Amount": payment.amount,
+            "Status": payment.status,
+            "Transaction ID": payment.transaction_id
+        })
+
+    df = pd.DataFrame(data)
+
+    file_name = "transactions.csv"
+
+    df.to_csv(file_name, index=False)
+
+    return {
+        "message": "CSV Exported Successfully",
+        "file": file_name
+    }
+
+
+def create_statement_log(db, user_id, statement_type):
+
+    statement = models.StatementLog(
+        user_id=user_id,
+        statement_type=statement_type
+    )
+
+    db.add(statement)
+    db.commit()
+    db.refresh(statement)
+
+    return statement
+
+def get_statement_logs(db):
+
+    return db.query(models.StatementLog).all()

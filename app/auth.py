@@ -3,7 +3,7 @@ import hashlib
 from jose import jwt
 
 from datetime import datetime, timedelta
-
+from fastapi import Depends, HTTPException
 
 # ================= SECRET KEY =================
 
@@ -56,3 +56,41 @@ def create_access_token(data: dict):
     )
 
     return encoded_jwt
+
+from fastapi import Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+
+def get_current_user_role(token: str = Depends(oauth2_scheme)):
+
+    try:
+
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        role = payload.get("role")
+
+        return role
+
+    except Exception:
+
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Token"
+        )
+
+
+def admin_only(role: str = Depends(get_current_user_role)):
+
+    if role != "ADMIN":
+
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required"
+        )
