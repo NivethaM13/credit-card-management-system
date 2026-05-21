@@ -75,7 +75,24 @@ def login(
         form_data.username
     )
 
+    attempt = db.query(
+        models.FailedLoginAttempt
+    ).filter(
+        models.FailedLoginAttempt.email == form_data.username
+    ).first()
+
+    if attempt and attempt.is_blocked == "YES":
+
+        return {
+            "message": "Account blocked due to multiple failed attempts"
+        }
+
     if not db_user:
+
+        crud.track_failed_login(
+            db,
+            form_data.username
+        )
 
         return {
             "message": "User not found"
@@ -86,6 +103,11 @@ def login(
         db_user.password
     ):
 
+        crud.track_failed_login(
+            db,
+            form_data.username
+        )
+
         return {
             "message": "Invalid password"
         }
@@ -93,8 +115,7 @@ def login(
     token = create_access_token(
         data={
             "sub": db_user.email,
-            "role":db_user.role
-
+            "role": db_user.role
         }
     )
 
@@ -103,8 +124,6 @@ def login(
         "access_token": token,
         "role": db_user.role
     }
-
-
 # ================= ADD CARD =================
 
 @app.post("/add-card")

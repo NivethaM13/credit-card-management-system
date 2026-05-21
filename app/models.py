@@ -211,4 +211,17 @@ class StatementLog(Base):
     generated_at = Column(String(100))
 
 
+class FailedLoginAttempt(Base):
+
+    __tablename__ = "failed_login_attempts"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    email = Column(String(100))
+
+    attempt_count = Column(Integer, default=0)
+
+    is_blocked = Column(String(10), default="NO")
+
+
     

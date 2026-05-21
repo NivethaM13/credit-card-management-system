@@ -481,3 +481,35 @@ def create_statement_log(db, user_id, statement_type):
 def get_statement_logs(db):
 
     return db.query(models.StatementLog).all()
+
+
+def track_failed_login(db, email):
+
+    attempt = db.query(
+        models.FailedLoginAttempt
+    ).filter(
+        models.FailedLoginAttempt.email == email
+    ).first()
+
+    if attempt:
+
+        attempt.attempt_count += 1
+
+        if attempt.attempt_count >= 3:
+
+            attempt.is_blocked = "YES"
+
+    else:
+
+        attempt = models.FailedLoginAttempt(
+            email=email,
+            attempt_count=1
+        )
+
+        db.add(attempt)
+
+    db.commit()
+
+    db.refresh(attempt)
+
+    return attempt
