@@ -1,8 +1,6 @@
 from fastapi import FastAPI, Depends
 from fastapi.responses import FileResponse
 import csv
-
-import csv
 from reportlab.pdfgen import canvas
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -112,6 +110,11 @@ def login(
             "message": "Invalid password"
         }
 
+    crud.reset_failed_attempts(
+        db,
+        form_data.username
+    )
+
     token = create_access_token(
         data={
             "sub": db_user.email,
@@ -124,6 +127,8 @@ def login(
         "access_token": token,
         "role": db_user.role
     }
+
+
 # ================= ADD CARD =================
 
 @app.post("/add-card")
@@ -305,14 +310,15 @@ def create_notification(
     )
 
 
-# ================= FILTER TRANSACTIONS =================
-
+# ================= ADVANCED FILTER TRANSACTIONS =================
 
 @app.get("/filter-transactions")
 def filter_transactions(
     status: str = None,
     min_amount: float = None,
     max_amount: float = None,
+    start_date: str = None,
+    end_date: str = None,
     db: Session = Depends(get_db)
 ):
 
@@ -320,8 +326,11 @@ def filter_transactions(
         db,
         status,
         min_amount,
-        max_amount
+        max_amount,
+        start_date,
+        end_date
     )
+
 
 # ================= CREATE AUDIT LOG =================
 
@@ -401,4 +410,72 @@ def download_statement_csv(
         path=filename,
         filename=filename,
         media_type='text/csv'
+    )
+
+
+# ================= DOWNLOAD PDF STATEMENT =================
+
+@app.get("/download-statement-pdf")
+def download_statement_pdf(
+    db: Session = Depends(get_db)
+):
+
+    transactions = crud.get_transactions(db)
+
+    crud.create_statement_log(
+        db=db,
+        user_id=1,
+        statement_type="PDF"
+    )
+
+    filename = "statement.pdf"
+
+    pdf = canvas.Canvas(filename)
+
+    pdf.drawString(200, 800, "Transaction Statement")
+
+    y = 750
+
+    for transaction in transactions:
+
+        line = f"ID: {transaction.id} | Amount: {transaction.amount} | Status: {transaction.status}"
+
+        pdf.drawString(50, y, line)
+
+        y -= 30
+
+    pdf.save()
+
+    return FileResponse(
+        path=filename,
+        filename=filename,
+        media_type='application/pdf'
+    )
+
+
+# ================= MARK NOTIFICATION AS READ =================
+
+@app.put("/mark-notification-read/{notification_id}")
+def mark_notification_read(
+    notification_id: int,
+    db: Session = Depends(get_db)
+):
+
+    return crud.mark_notification_as_read(
+        db,
+        notification_id
+    )
+
+
+# ================= SEARCH TRANSACTION BY ID =================
+
+@app.get("/search-transaction/{transaction_id}")
+def search_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db)
+):
+
+    return crud.search_transaction_by_id(
+        db,
+        transaction_id
     )

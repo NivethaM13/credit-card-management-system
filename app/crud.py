@@ -361,13 +361,16 @@ def create_notification(
 
     return new_notification
 
-# ================= FILTER TRANSACTIONS =================
+
+
 
 def filter_transactions(
     db,
     status=None,
     min_amount=None,
-    max_amount=None
+    max_amount=None,
+    start_date=None,
+    end_date=None
 ):
 
     query = db.query(models.Transaction)
@@ -388,6 +391,18 @@ def filter_transactions(
 
         query = query.filter(
             models.Transaction.amount <= max_amount
+        )
+
+    if start_date:
+
+        query = query.filter(
+            models.Transaction.created_at >= start_date
+        )
+
+    if end_date:
+
+        query = query.filter(
+            models.Transaction.created_at <= end_date
         )
 
     return query.all()
@@ -513,3 +528,68 @@ def track_failed_login(db, email):
     db.refresh(attempt)
 
     return attempt
+
+
+def mark_notification_as_read(
+    db,
+    notification_id
+):
+
+    notification = db.query(
+        models.Notification
+    ).filter(
+        models.Notification.id == notification_id
+    ).first()
+
+    if not notification:
+
+        return {
+            "message": "Notification not found"
+        }
+
+    notification.is_read = True
+
+    db.commit()
+
+    db.refresh(notification)
+
+    return notification
+
+
+def search_transaction_by_id(
+    db,
+    transaction_id
+):
+
+    transaction = db.query(
+        models.Transaction
+    ).filter(
+        models.Transaction.id == transaction_id
+    ).first()
+
+    if not transaction:
+
+        return {
+            "message": "Transaction not found"
+        }
+
+    return transaction
+
+def reset_failed_attempts(
+    db,
+    email
+):
+
+    attempt = db.query(
+        models.FailedLoginAttempt
+    ).filter(
+        models.FailedLoginAttempt.email == email
+    ).first()
+
+    if attempt:
+
+        attempt.attempt_count = 0
+
+        attempt.is_blocked = "NO"
+
+        db.commit()
